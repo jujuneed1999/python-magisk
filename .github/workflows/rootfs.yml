@@ -1,0 +1,36 @@
+name: Build Debian RootFS AArch64
+
+on:
+  workflow_dispatch:
+    inputs:
+      debian_version:
+        description: 'Debian Release (e.g. bookworm, bullseye)'
+        required: true
+        default: 'bookworm'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # Compatible with act 0.2.24
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y debootstrap qemu-user-static binfmt-support
+
+    - name: Build Debian RootFS for AArch64
+      run: |
+        mkdir -p rootfs
+        sudo debootstrap --arch=arm64 --foreign ${{ github.event.inputs.debian_version }} rootfs http://deb.debian.org/debian
+        sudo cp /usr/bin/qemu-aarch64-static rootfs/usr/bin/
+        sudo chroot rootfs /debootstrap/debootstrap --second-stage
+        sudo tar -czf debian-${{ github.event.inputs.debian_version }}-aarch64-rootfs.tar.gz -C rootfs .
+
+    - name: Upload rootfs artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: debian-${{ github.event.inputs.debian_version }}-aarch64-rootfs
+        path: debian-${{ github.event.inputs.debian_version }}-aarch64-rootfs.tar.gz
